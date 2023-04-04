@@ -4,6 +4,7 @@
 
 
 FlexCAN_T4 <CAN2, RX_SIZE_256, TX_SIZE_16> ACU_;
+FlexCAN_T4 <CAN1, RX_SIZE_256, TX_SIZE_16> CAN_1;
 
 
 void init_CAN()
@@ -31,11 +32,29 @@ void init_CAN()
 }
 
 
-int ReadCAN(CAN_message_t &msg)
+int ReadBatteryTemps(CAN_message_t &msg)
 {
     
     int rxMSG = ACU_.read(msg);
 
     return rxMSG;
+
+}
+
+
+void WriteToBMS(uint32_t id, uint8_t buf[])
+{
+
+    CAN_message_t msg;
+
+    msg.id = id;
+
+    msg.flags.extended = true;
+
+
+    msg.buf[0] = buf[6];
+    msg.buf[1] = buf[7];
+
+    CAN_1.write(msg);
 
 }

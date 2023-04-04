@@ -11,7 +11,10 @@
 
 
 void init_CAN();
-int ReadCAN(CAN_message_t &msg);
+
+int ReadBatteryTemps(CAN_message_t &msg);
+
+void WriteToBMS(uint32_t id, uint8_t buf[]);
 
 
 #endif

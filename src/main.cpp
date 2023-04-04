@@ -22,22 +22,23 @@ void setup()
 void loop()
 {
 
-    if(ReadCAN(rxMsg))
+    if(ReadBatteryTemps(rxMsg))
     {
 
         if (rxMsg.id == 0xB0)
         {
 
             memcpy(temp1, rxMsg.buf, rxMsg.len);
+            WriteToBMS(0x9839F380, temp1);
 
         }
         else if (rxMsg.id == 0xB1)
         {
 
             memcpy(temp2, rxMsg.buf, rxMsg.len);
+            WriteToBMS(0x9839F380, temp2);
 
         }
-
 
     }
 
