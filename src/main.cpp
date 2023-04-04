@@ -29,18 +29,19 @@ void loop()
         {
 
             memcpy(temp1, rxMsg.buf, rxMsg.len);
-            WriteToBMS(0x9839F380, temp1);
 
         }
         else if (rxMsg.id == 0xB1)
         {
 
             memcpy(temp2, rxMsg.buf, rxMsg.len);
-            WriteToBMS(0x9839F380, temp2);
 
         }
 
     }
+
+    WriteToBMS(0x9839F380, temp1);
+    WriteToBMS(0x9839F381, temp2);
 
     delay(1000);
 

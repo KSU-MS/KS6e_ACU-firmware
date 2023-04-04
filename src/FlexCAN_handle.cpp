@@ -11,9 +11,14 @@ void init_CAN()
 {
 
     ACU_.begin();
+    CAN_1.begin();
+
     ACU_.setBaudRate(500000);
+    CAN_1.setBaudRate(500000);
 
     ACU_.setMaxMB(NUM_TX_MAILBOXES + NUM_RX_MAILBOXES);
+    CAN_1.setMaxMB(NUM_TX_MAILBOXES + NUM_RX_MAILBOXES);
+
 
     for (int i = 0; i < NUM_RX_MAILBOXES; i++)
     {
@@ -26,6 +31,20 @@ void init_CAN()
     {
 
         ACU_.setMB((FLEXCAN_MAILBOX)i, TX, STD);
+
+    }
+
+    for (int i = 0; i < NUM_RX_MAILBOXES; i++)
+    {
+
+        CAN_1.setMB((FLEXCAN_MAILBOX)i, RX, STD);
+        
+    }
+
+    for (int i = NUM_RX_MAILBOXES; i < (NUM_TX_MAILBOXES + NUM_RX_MAILBOXES); i++)
+    {
+
+        CAN_1.setMB((FLEXCAN_MAILBOX)i, TX, STD);
 
     }
 
@@ -49,7 +68,7 @@ void WriteToBMS(uint32_t id, uint8_t buf[])
 
     msg.id = id;
 
-    msg.flags.extended = true;
+    msg.flags.extended = false;
 
 
     msg.buf[0] = buf[6];

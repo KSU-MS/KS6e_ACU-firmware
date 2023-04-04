@@ -6,8 +6,8 @@
 #include <FlexCAN_T4.h>
 
 
-#define NUM_TX_MAILBOXES 6
-#define NUM_RX_MAILBOXES 2
+#define NUM_TX_MAILBOXES 2
+#define NUM_RX_MAILBOXES 6
 
 
 void init_CAN();
