@@ -91,7 +91,7 @@ Metro getRelay = Metro(100);
 Metro printDebug = Metro(1000);
 
 // Globals
-int globalHighTherm = 25, globalLowTherm = 25;
+int globalHighTherm = 30, globalLowTherm = 30;
 int pixelColor=0;
 bool inverter_restart = false;
 
