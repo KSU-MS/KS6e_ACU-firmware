@@ -18,6 +18,7 @@
 #include <MDB_labels.h>
 #include <math.h>
 #include <ADC_SPI.h>
+#include <FreqMeasureMulti.h>
 #define DEBUG
 // #define cantest
 
@@ -103,17 +104,27 @@ int readACC_1(CAN_message_t &msg);
 void updateAccumulatorCAN();
 void getTempData();
 void sendTempData();
+void check_imd_pwm();
 //void readBroadcast();
 ADC_SPI pedal_ADC;
+//PWM measuring variables
+FreqMeasureMulti imd_pwm;
+float sum1 = 0;
+int count1 = 0;
+int freq1Reads[4];
+uint8_t levels[4];
+elapsedMillis timeout;
+
 // Setup -----------------------------------------------------------------------
 void setup()
 {
-    pedal_ADC = ADC_SPI(DEFAULT_SPI_CS, DEFAULT_SPI_SPEED);
+    pedal_ADC = ADC_SPI(DEFAULT_SPI_CS, DEFAULT_SPI_SPEED); //init ADC
     pinMode(FAN_CTRL,OUTPUT);
     analogReadResolution(8); //12.890625mV per bit at 8bit resolution (3.3v/256)
     Serial.begin(115200);
     delay(400);
 
+    imd_pwm.begin(IMD_SENSE,FREQMEASUREMULTI_RAISING); //init PWM sensing
     // This is the main raw battery temp array for  
     Serial.println("Raw battery temp array: ");
     for (int i = 0; i < NUMBER_OF_CELLS; i++)
@@ -169,11 +180,12 @@ void setup()
     delay(50);
     DashLedscolorWipe(GREEN);
 }
-// Setup -----------------------------------------------------------------------
+// End setup -----------------------------------------------------------------------
 
 // Main loop -----------------------------------------------------------------------
 void loop()
 {
+    check_imd_pwm();
     if(heartBeat.check()) {
         // digitalToggle(LED_BUILTIN);
         // Sadly this has to be disabled in order for the SPI comms to work (The SPI peripheral uses pin 13 which is shared with the LED)
@@ -557,4 +569,33 @@ void get_vi_measurements(){
     #ifdef DEBUG
     Serial.printf("\nSDC voltage: %d current: %d 12v voltage: %d current: %d 5v voltage: %d fan current: %d humidity v: %d temp v: %d\n",sdcvsense,sdcsense,vsense12v,sense12v,vsense5v,sensefan,humidity,temp);
     #endif
+}
+
+void check_imd_pwm(){
+  if (imd_pwm.available()) {
+    for (uint8_t i = 3; i > 0; i--) {
+      freq1Reads[i] = freq1Reads[i - 1];
+      levels[i] = levels[i - 1];
+    }
+    freq1Reads[0] = imd_pwm.read();
+    levels[0] = imd_pwm.readLevel();
+    sum1 = sum1 + freq1Reads[0];
+    count1 = count1 + 1;
+  }
+  //print results each half second
+  if (timeout > 500) {
+    if (count1 > 0) {
+      Serial.print(imd_pwm.countToFrequency(sum1 / count1));
+      Serial.print("(");
+      for (uint8_t i = 0; i < 4; i++)
+        Serial.printf("%u:%u:%.2f ", levels[i], freq1Reads[i], imd_pwm.countToNanoseconds(freq1Reads[i])/1000000.0);
+      Serial.print(")");
+    } else {
+      Serial.print("(no pulses)");
+    }
+    Serial.println();
+    sum1 = 0;
+    count1 = 0;
+    timeout = 0;
+  }
 }
