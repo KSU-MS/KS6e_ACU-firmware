@@ -59,16 +59,14 @@ int8_t rawBatteryTemps[NUMBER_OF_CELLS];
 int8_t batteryTemps[NUMBER_OF_CELLS];
 float ratioTemps; // This is just to make the array a temp variable
 float floatTemps; // This is to save the math as a float first
-float cal5 = -0.000002416676401;
-float cal4 = 0.001082617446913;
-float cal3 = -0.194488265848684; // First part of the ^3 best fit
+float cal5 = -0.000002416676401; // Fifth
+float cal4 = 0.001082617446913; // Fourth
+float cal3 = -0.194488265848684; // Third
 float cal2 = 17.519770902801400; // Second
-float cal1 = -792.865188960333000; // Third
+float cal1 = -792.865188960333000; // First part of the ^3 best fit
 float calIntercept = 14494.861100594600000;
 
-
-
-// floatTemps=((((cal5V*rawBatteryTe`1  qaaaaaaa    1qA1QAz1amps[i])/cal255)*(calM))+calB);
+// floatTemps=((((cal5V*rawBatteryTemps[i])/cal255)*(calM))+calB);
 
 bool goodID=false;
 
@@ -83,6 +81,7 @@ byte getHighestTemp[] = {0x03, 0x22, 0xF0, 0x29, 0x55, 0x55, 0x55, 0x55}; // hig
 Metro getACCCanRate = Metro(5,1);
 Metro getTempRate = Metro(500,1);
 Metro sendTempRate = Metro(100,1);
+Metro forwardTempRate = Metro(100,1);
 Metro sendCAN_1 = Metro(50,1);
 Metro sendCANTest = Metro(50,1);
 
@@ -104,6 +103,7 @@ int readACC_1(CAN_message_t &msg);
 void updateAccumulatorCAN();
 void getTempData();
 void sendTempData();
+void forwardTempData(uint32_t id, int inital, int end);
 //void readBroadcast();
 ADC_SPI pedal_ADC;
 // Setup -----------------------------------------------------------------------
@@ -186,6 +186,21 @@ void loop()
 
     if (sendTempRate.check()){
         sendTempData();
+    }
+
+    if (forwardTempRate.check()){
+        forwardTempData(MODULE_1_A, CELLS_1A, CELLS_1B);
+        forwardTempData(MODULE_1_B, CELLS_1B, CELLS_2A);
+        forwardTempData(MODULE_2_A, CELLS_2A, CELLS_2B);
+        forwardTempData(MODULE_2_B, CELLS_2B, CELLS_3A);
+        forwardTempData(MODULE_3_A, CELLS_3A, CELLS_3B);
+        forwardTempData(MODULE_3_B, CELLS_3B, CELLS_4A);
+        forwardTempData(MODULE_4_A, CELLS_4A, CELLS_4B);
+        forwardTempData(MODULE_4_B, CELLS_4B, CELLS_5A);
+        forwardTempData(MODULE_5_A, CELLS_5A, CELLS_5B);
+        forwardTempData(MODULE_5_B, CELLS_5B, CELLS_6A);
+        forwardTempData(MODULE_6_A, CELLS_6A, CELLS_6B);
+        forwardTempData(MODULE_6_B, CELLS_6B, NUMBER_OF_CELLS);
     }
 
     if(getRelay.check()){
@@ -362,6 +377,18 @@ void updateAccumulatorCAN()
     }
 }
 
+void forwardTempData(uint32_t id, int initial, int end)
+{
+    // Forwarding the calibrated messages onto the CAN 1 (BMS, ACU, VCU, Precharge)
+    CAN_message_t sendTempMsg;
+    sendTempMsg.len = 8; // per protocol
+    sendTempMsg.id = id; // broadcast ID
+    for (int i=initial; i < end; i++)   {
+        sendTempMsg.buf[i] = batteryTemps[i];
+    }
+    CAN_1.write(sendTempMsg);
+}
+
 // Sending highest/lowest temperature to the BMS
 void sendTempData()
 {
@@ -374,12 +401,9 @@ void sendTempData()
     // This is assigning the calibrated battery temp array from the raw recieved one
     for (int i = 0; i < NUMBER_OF_CELLS; i++)
     {
-
         // Below is some big BS lmao
         ratioTemps = rawBatteryTemps[i]; // Sets the current part of the array to a temp variable so math functions can be done on it
-
         floatTemps=(cal5*pow(ratioTemps,5))+(cal4*pow(ratioTemps,4))+(cal3*pow(ratioTemps,3))+(cal2*pow(ratioTemps,2))+(cal1*(ratioTemps))+calIntercept; // Performs the calibration curve math
-        
         batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
         
         #ifdef DEBUG
