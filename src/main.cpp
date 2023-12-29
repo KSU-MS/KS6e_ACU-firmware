@@ -79,6 +79,7 @@ byte getLowestTemp[] = {0x03, 0x22, 0xF0, 0x28, 0x55, 0x55, 0x55, 0x55};  // low
 byte getHighestTemp[] = {0x03, 0x22, 0xF0, 0x29, 0x55, 0x55, 0x55, 0x55}; // highest temp request
 
 // CAN timings
+
 Metro getACCCanRate = Metro(5,1);
 Metro getTempRate = Metro(500,1);
 Metro sendTempRate = Metro(100,1);
@@ -92,7 +93,7 @@ Metro getRelay = Metro(100);
 Metro printDebug = Metro(1000);
 
 // Globals
-int globalHighTherm = 25, globalLowTherm = 25;
+int globalHighTherm = 30, globalLowTherm = 30;
 int pixelColor=0;
 bool inverter_restart = false;
 
@@ -382,22 +383,22 @@ void sendTempData()
         batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
         
         #ifdef DEBUG
-        Serial.print("Cell number: ");
-        Serial.print(i);
-        Serial.print("Raw Value: ");
-        Serial.println(rawBatteryTemps[i]);
+            // Serial.print("Cell number: ");
+            // Serial.print(i);
+            // Serial.print("Raw Value: ");
+            // Serial.println(rawBatteryTemps[i]);
 
-        Serial.print("Cell number: ");
-        Serial.print(i);
-        Serial.print("floatTemps Value: ");
-        Serial.println(floatTemps);
+            // Serial.print("Cell number: ");
+            // Serial.print(i);
+            // Serial.print("floatTemps Value: ");
+            // Serial.println(floatTemps);
 
-        Serial.print("Cell number: ");
-        Serial.print(i);
-        Serial.print(" Value: ");
-        Serial.println(batteryTemps[i]);
+            Serial.print("Cell number: ");
+            Serial.print(i);
+            Serial.print(" Value: ");
+            Serial.println(batteryTemps[i]);
 
-        Serial.println();
+            // Serial.println();
         #endif
 
     }
@@ -410,19 +411,16 @@ void sendTempData()
     for (int i = 0; i < NUMBER_OF_CELLS; i++)
     { // get lowest and highest
         
-        if(i>=0 && i<=5){
+        if(i>=0 && i<=11){
             goodID=true;
         }
-        else if(i>=12 && i<=15){
-            goodID=true;
-        }
-        else if(i>=17 && i<=17){
-            goodID=true;
-        }
+        // else if(i>=17 && i<=23){
+        //     goodID=true;
+        // }
         else if(i>=36 && i<=41){
             goodID=true;
         }
-        else if(i>=48 && i<=53){
+        else if(i>=44 && i<=59){
             goodID=true;
         }
         else{
