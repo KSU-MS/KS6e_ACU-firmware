@@ -39,8 +39,8 @@
 #define CELLS_6B CELLS_PER_MODULE*11/2
 
 //objects
-#define NUM_TX_MAILBOXES 2
-#define NUM_RX_MAILBOXES 6
+#define NUM_TX_MAILBOXES 32
+#define NUM_RX_MAILBOXES 32
 FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> ACC_1;
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> CAN_1;
 static CAN_message_t testMsg;
@@ -82,6 +82,7 @@ Metro getACCCanRate = Metro(5,1);
 Metro getTempRate = Metro(500,1);
 Metro sendTempRate = Metro(100,1);
 Metro forwardTempRate = Metro(100,1);
+// Metro forwardTempData2 = Metro(10000,1);
 Metro sendCAN_1 = Metro(50,1);
 Metro sendCANTest = Metro(50,1);
 
@@ -95,6 +96,7 @@ Metro printDebug = Metro(1000);
 int globalHighTherm = 30, globalLowTherm = 30;
 int pixelColor=0;
 bool inverter_restart = false;
+int moduleCounter = 0; // For the forwardTempData function
 
 /*****PROTOTYPES*****/
 void get_relay_states();
@@ -188,20 +190,87 @@ void loop()
         sendTempData();
     }
 
-    if (forwardTempRate.check()){
-        forwardTempData(MODULE_1_A, CELLS_1A, CELLS_1B);
-        forwardTempData(MODULE_1_B, CELLS_1B, CELLS_2A);
-        forwardTempData(MODULE_2_A, CELLS_2A, CELLS_2B);
-        forwardTempData(MODULE_2_B, CELLS_2B, CELLS_3A);
-        forwardTempData(MODULE_3_A, CELLS_3A, CELLS_3B);
-        forwardTempData(MODULE_3_B, CELLS_3B, CELLS_4A);
-        forwardTempData(MODULE_4_A, CELLS_4A, CELLS_4B);
-        forwardTempData(MODULE_4_B, CELLS_4B, CELLS_5A);
-        forwardTempData(MODULE_5_A, CELLS_5A, CELLS_5B);
-        forwardTempData(MODULE_5_B, CELLS_5B, CELLS_6A);
-        forwardTempData(MODULE_6_A, CELLS_6A, CELLS_6B);
-        forwardTempData(MODULE_6_B, CELLS_6B, NUMBER_OF_CELLS);
-    }
+    // The below code was an attempt to forward the module temp data to canbus 1, however, it causes the teensy to brick and reset.
+    // If you send more than 5 messages in a row, it will cause the teensy to reset. I'm not sure why this is happening lol
+    // I tried 
+
+    // if (forwardTempRate.check()){
+    //     // if(moduleCounter>=11) {
+    //     //     moduleCounter = 0;
+    //     // }
+    //     // switch(moduleCounter){
+    //     //     case(0):
+    //     //     {
+    //     //     forwardTempData(MODULE_1_A, CELLS_1A, CELLS_1B);
+    //     //     break;
+    //     //     Serial.println("Sent data for module 1A");
+    //     //     }
+    //     //     case(1):
+    //     //     {
+    //     //     forwardTempData(MODULE_1_B, CELLS_1B, CELLS_2A);
+    //     //     break;
+    //     //     }
+    //     //     case(2):
+    //     //     {
+    //     //     forwardTempData(MODULE_2_A, CELLS_2A, CELLS_2B);
+    //     //     break;
+    //     //     }
+    //     //     // case(3):
+    //     //     // {
+    //     //     // forwardTempData(MODULE_2_B, CELLS_2B, CELLS_3A);
+    //     //     // break;
+    //     //     // }
+    //     //     // case(4):
+    //     //     // {
+    //     //     // forwardTempData(MODULE_3_A, CELLS_3A, CELLS_3B);
+    //     //     // break;
+    //     //     // }
+    //     //     // case(5):
+    //     //     // forwardTempData(MODULE_3_B, CELLS_3B, CELLS_4A);
+    //     //     // break;
+    //     //     // case(6):
+    //     //     // forwardTempData(MODULE_4_A, CELLS_4A, CELLS_4B);
+    //     //     // break;
+    //     //     // case(7):
+    //     //     // forwardTempData(MODULE_4_B, CELLS_4B, CELLS_5A);
+    //     //     // break;
+    //     //     // case(8):
+    //     //     // forwardTempData(MODULE_5_A, CELLS_5A, CELLS_5B);
+    //     //     // break;
+    //     //     // case(9):
+    //     //     // forwardTempData(MODULE_5_B, CELLS_5B, CELLS_6A);
+    //     //     // break;
+    //     //     // case(10):
+    //     //     // forwardTempData(MODULE_6_A, CELLS_6A, CELLS_6B);
+    //     //     // break;
+    //     //     // case(11):
+    //     //     // forwardTempData(MODULE_6_B, CELLS_6B, NUMBER_OF_CELLS);
+    //     //     // break;
+    //     //     // default:
+    //     //     // break;
+
+    //     // }
+
+    //     // moduleCounter++;   
+
+    //     // delay(50);
+
+    //     // forwardTempData(0x1a0, CELLS_1A, CELLS_1B);
+    //     // forwardTempData(0x1b0, CELLS_1B, CELLS_2A);
+    //     // forwardTempData(0x2a0, CELLS_2A, CELLS_2B);
+    //     // forwardTempData(0x2b0, CELLS_2B, CELLS_3A);
+    //     // forwardTempData(0x3a0, CELLS_3A, CELLS_3B);
+    //     // forwardTempData(0x3b0, CELLS_3B, CELLS_4A);
+    // }
+
+    // // if(forwardTempData2.check()){
+    // //     forwardTempData(0x4a0, CELLS_4A, CELLS_4B);
+    // //     forwardTempData(0x4b0, CELLS_4B, CELLS_5A);
+    // //     forwardTempData(0x5a0, CELLS_5A, CELLS_5B);
+    // //     forwardTempData(0x5b0, CELLS_5B, CELLS_6A);
+    // //     forwardTempData(0x6a0, CELLS_6A, CELLS_6B);
+    // //     forwardTempData(0x6b0, CELLS_6B, NUMBER_OF_CELLS);
+    // // }
 
     if(getRelay.check()){
         get_relay_states();
@@ -281,6 +350,8 @@ void updateAccumulatorCAN()
     CAN_message_t rxMsg;
     if (readACC_1(rxMsg))
     {
+        CAN_1.write(rxMsg);
+        
         #ifdef DEBUG
         // Serial.print("MB "); Serial.print(rxMsg.mb);
         // Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
@@ -383,10 +454,35 @@ void forwardTempData(uint32_t id, int initial, int end)
     CAN_message_t sendTempMsg;
     sendTempMsg.len = 8; // per protocol
     sendTempMsg.id = id; // broadcast ID
+    Serial.printf("Starting to populate the message buffer for ID : %d\n",sendTempMsg.id);
     for (int i=initial; i < end; i++)   {
-        sendTempMsg.buf[i] = batteryTemps[i];
+        sendTempMsg.buf[i] = static_cast<uint8_t>(batteryTemps[i]);
+        // sendTempMsg.buf[i] = 0;
+
     }
+    Serial.printf("Start index: %d, End index: %d\n",initial,end);
+    Serial.println("The message we're about to send: ");
+    Serial.print("MB "); 
+    Serial.print(sendTempMsg.mb);
+    Serial.print("  OVERRUN: "); 
+    Serial.print(sendTempMsg.flags.overrun);
+    Serial.print("  LEN: "); 
+    Serial.print(sendTempMsg.len);
+    Serial.print(" EXT: "); 
+    Serial.print(sendTempMsg.flags.extended);
+    Serial.print(" TS: "); 
+    Serial.print(sendTempMsg.timestamp);
+    Serial.print(" ID: "); \
+    Serial.print(sendTempMsg.id, HEX);
+    Serial.print(" Buffer: ");
+    for ( uint8_t i = 0; i < sendTempMsg.len; i++ ) {
+        Serial.print(sendTempMsg.buf[i], HEX); Serial.print(" ");
+    } 
+    Serial.println();
     CAN_1.write(sendTempMsg);
+    Serial.println("Sent Temp Data: ");
+    Serial.print(id);
+    Serial.println(" ");
 }
 
 // Sending highest/lowest temperature to the BMS
