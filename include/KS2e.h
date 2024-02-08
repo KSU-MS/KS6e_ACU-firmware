@@ -38,4 +38,20 @@ bool imdstate;
 bool bmsstate;
 bool imdgpiostate;
 bool bmsgpiostate;
+
+// class FreqReading
+// {
+
+// private:
+//     float sum1 = 0;
+//     int count1 = 0;
+//     int freq1Reads[4];
+//     uint8_t levels[4];
+//     elapsedMillis timeout;
+//     FreqMeasureMulti imd_pwm;
+
+// public:
+    
+// };
+
 #endif
