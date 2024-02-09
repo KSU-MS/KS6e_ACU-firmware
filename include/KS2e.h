@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <KS2eVCUgpios.h>
-#include <VCUNeoPixelBullshitLMFAO.h>
+// #include <VCUNeoPixelBullshitLMFAO.h>
 #include <KS2eCAN.hpp>
 // #include <drivers.h>
 //Pedalbox stuff
