@@ -32,9 +32,9 @@
 
 
 #define ID_BMS_INFO     0x6B1
-#define ID_ACU_RELAY    0x68
+#define ID_ACU_RELAY    0x258
 #define ID_PRECHARGE_STATUS 0x69
-#define ID_ACU_MEASUREMENTS 0xC7
+#define ID_ACU_MEASUREMENTS 0x259
 
 // number of rx and tx mailboxes
 #define NUM_TX_MAILBOXES 2

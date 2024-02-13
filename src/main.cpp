@@ -60,12 +60,12 @@ int8_t rawBatteryTemps[NUMBER_OF_CELLS];
 int8_t batteryTemps[NUMBER_OF_CELLS];
 float ratioTemps; // This is just to make the array a temp variable
 float floatTemps; // This is to save the math as a float first
-float cal5 = -0.000002416676401;
-float cal4 = 0.001082617446913;
-float cal3 = -0.194488265848684;   // First part of the ^3 best fit
-float cal2 = 17.519770902801400;   // Second
-float cal1 = -792.865188960333000; // Third
-float calIntercept = 14494.861100594600000;
+const float cal5 = -0.000002416676401;
+const float cal4 = 0.001082617446913;
+const float cal3 = -0.194488265848684;   // First part of the ^3 best fit
+const float cal2 = 17.519770902801400;   // Second
+const float cal1 = -792.865188960333000; // Third
+const float calIntercept = 14494.861100594600000;
 
 
 // floatTemps=((((cal5V*rawBatteryTe`1  qaaaaaaa    1qA1QAz1amps[i])/cal255)*(calM))+calB);
@@ -81,7 +81,7 @@ byte getHighestTemp[] = {0x03, 0x22, 0xF0, 0x29, 0x55, 0x55, 0x55, 0x55}; // hig
 Metro getACCCanRate = Metro(100, 1);
 Metro getTempRate = Metro(500, 1);
 Metro sendTempRate = Metro(100, 1);
-Metro sendCAN_1 = Metro(50, 1);
+Metro sendCAN_1 = Metro(500, 1);
 Metro sendCANTest = Metro(50, 1);
 
 // Regular timings
@@ -89,7 +89,6 @@ Metro fanTest = Metro(5000);
 Metro heartBeat = Metro(500);
 Metro getRelay = Metro(100);
 Metro printDebug = Metro(1000);
-Metro check_imd_pwm = Metro(1, 1);
 IntervalTimer check_imd_pwm_timer;
 
 // Globals
@@ -111,15 +110,15 @@ void update_imd_readings()
 {
     imd_freq_reading.update_readings();
 }
-ADC_SPI pedal_ADC;
+ADC_SPI adc_spi;
 
 // Setup -----------------------------------------------------------------------
 void setup()
 {
 
-    analogWriteFrequency(NEOPIXEL_DIN, 20);
-    analogWrite(NEOPIXEL_DIN, 256 / 4);
-    pedal_ADC = ADC_SPI(DEFAULT_SPI_CS, DEFAULT_SPI_SPEED); // init ADC
+    // analogWriteFrequency(NEOPIXEL_DIN, 20); // TODO remove this for commissioning
+    // analogWrite(NEOPIXEL_DIN, 256 / 4);
+    adc_spi = ADC_SPI(DEFAULT_SPI_CS, DEFAULT_SPI_SPEED); // init ADC
     pinMode(FAN_CTRL, OUTPUT);
     pinMode(IMD_SENSE, INPUT);
     analogReadResolution(8); // 12.890625mV per bit at 8bit resolution (3.3v/256)
@@ -534,10 +533,10 @@ void getTempData()
 void get_relay_states()
 { // Changed to relay
     /* Filter ADC readings */
-    imdrelay = pedal_ADC.read_adc(IMD_RELAY);
-    bmsrelay = pedal_ADC.read_adc(BMS_RELAY);
-    imdgpio = pedal_ADC.read_adc(IMD_GPIO);
-    bmsgpio = pedal_ADC.read_adc(BMS_GPIO);
+    imdrelay = adc_spi.read_adc(IMD_RELAY);
+    bmsrelay = adc_spi.read_adc(BMS_RELAY);
+    imdgpio = adc_spi.read_adc(IMD_GPIO);
+    bmsgpio = adc_spi.read_adc(BMS_GPIO);
 #ifdef DEBUG
 
     Serial.printf("ADC Channel IMDRELAY: %d BMSRELAY: %d IMDGPIO: %d BMSGPIO: %d\n", imdrelay, bmsrelay, imdgpio, bmsgpio);
@@ -610,32 +609,3 @@ void get_vi_measurements()
     Serial.printf("\nSDC voltage: %d current: %d 12v voltage: %d current: %d 5v voltage: %d fan current: %d humidity v: %d temp v: %d\n", sdcvsense, sdcsense, vsense12v, sense12v, vsense5v, sensefan, humidity, temp);
 #endif
 }
-
-// void check_imd_pwm(){
-//   if (imd_pwm.available()) {
-//     for (uint8_t i = 3; i > 0; i--) {
-//       freq1Reads[i] = freq1Reads[i - 1];
-//       levels[i] = levels[i - 1];
-//     }
-//     freq1Reads[0] = imd_pwm.read();
-//     levels[0] = imd_pwm.readLevel();
-//     sum1 = sum1 + freq1Reads[0];
-//     count1 = count1 + 1;
-//   }
-//   //print results each half second
-//   if (timeout > 500) {
-//     if (count1 > 0) {
-//       Serial.print(imd_pwm.countToFrequency(sum1 / count1));
-//       Serial.print("(");
-//       for (uint8_t i = 0; i < 4; i++)
-//         Serial.printf("%u:%u:%.2f ", levels[i], freq1Reads[i], imd_pwm.countToNanoseconds(freq1Reads[i])/1000000.0);
-//       Serial.print(")");
-//     } else {
-//       Serial.print("(no pulses)");
-//     }
-//     Serial.println();
-//     sum1 = 0;
-//     count1 = 0;
-//     timeout = 0;
-//   }
-// }
