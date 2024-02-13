@@ -19,6 +19,7 @@
 #include <math.h>
 #include <ADC_SPI.h>
 #include "freqmeasure.h"
+#include "device_status.h"
 // #define DEBUG
 // #define cantest
 
@@ -67,7 +68,6 @@ const float cal2 = 17.519770902801400;   // Second
 const float cal1 = -792.865188960333000; // Third
 const float calIntercept = 14494.861100594600000;
 
-
 // floatTemps=((((cal5V*rawBatteryTe`1  qaaaaaaa    1qA1QAz1amps[i])/cal255)*(calM))+calB);
 
 bool goodID = false;
@@ -81,7 +81,8 @@ byte getHighestTemp[] = {0x03, 0x22, 0xF0, 0x29, 0x55, 0x55, 0x55, 0x55}; // hig
 Metro getACCCanRate = Metro(100, 1);
 Metro getTempRate = Metro(500, 1);
 Metro sendTempRate = Metro(100, 1);
-Metro sendCAN_1 = Metro(500, 1);
+Metro send_can1_2hz = Metro(500, 1);
+Metro send_can1_1hz = Metro(1000, 1);
 Metro sendCANTest = Metro(50, 1);
 
 // Regular timings
@@ -111,6 +112,8 @@ void update_imd_readings()
     imd_freq_reading.update_readings();
 }
 ADC_SPI adc_spi;
+device_status_t acu_status_t;
+static CAN_message_t fw_hash_msg;
 
 // Setup -----------------------------------------------------------------------
 void setup()
@@ -176,6 +179,15 @@ void setup()
     ACC_1.setMB((FLEXCAN_MAILBOX)5, RX, EXT);
     CAN_1.mailboxStatus();
     ACC_1.mailboxStatus();
+    // build up fw git hash message
+    fw_hash_msg.id = ID_ACU_FW_VERSION;
+    fw_hash_msg.len = sizeof(acu_status_t) / sizeof(uint8_t);
+#if DEBUG
+    Serial.printf("FW git hash: %lu, IS_DIRTY: %d IS_MAIN: %d\n", AUTO_VERSION, FW_PROJECT_IS_DIRTY, FW_PROJECT_IS_MAIN_OR_MASTER);
+    Serial.printf("FW git hash in the struct: %lu\n", vcu_status_t.firmware_version);
+#endif
+    acu_status_t.on_time_seconds = millis() / 1000;
+    memcpy(fw_hash_msg.buf, &acu_status_t, sizeof(acu_status_t));
 
     // Dash stuff
     // leds.begin();
@@ -221,7 +233,7 @@ void loop()
         get_vi_measurements();
     }
 
-    if (sendCAN_1.check())
+    if (send_can1_2hz.check())
     {
         dashMsg.buf[0] = ID_ACU_RELAY;
         dashMsg.buf[1] = imdstate;
@@ -243,7 +255,12 @@ void loop()
         CAN_1.write(vi_measurementsMsg);
 
         Serial.printf("Imd freq: %f duty: %f\n", imd_freq_reading.get_imd_frequency(), imd_freq_reading.get_duty_cycle());
-
+    }
+    if (send_can1_1hz.check())
+    {
+        acu_status_t.on_time_seconds = millis() / 1000;
+        memcpy(fw_hash_msg.buf, &acu_status_t, sizeof(acu_status_t));
+        CAN_1.write(fw_hash_msg);
     }
 
     if (fanTest.check())
