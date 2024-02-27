@@ -18,31 +18,34 @@
 #include <MDB_labels.h>
 #include <math.h>
 #include <ADC_SPI.h>
+#define DEBUG
 #include "freqmeasure.h"
 #include "device_status.h"
-// #define DEBUG
+
 // #define cantest
 
 // BIG DEFINES FOR MODULES & SWITCH CASE (absolute cancer code)
 #define NUMBER_OF_CELLS 72
 #define NUMBER_OF_MODULES 6
 #define CELLS_PER_MODULE 12
-#define CELLS_1A CELLS_PER_MODULE * 0 / 2
-#define CELLS_1B CELLS_PER_MODULE * 1 / 2
-#define CELLS_2A CELLS_PER_MODULE * 2 / 2
-#define CELLS_2B CELLS_PER_MODULE * 3 / 2
-#define CELLS_3A CELLS_PER_MODULE * 4 / 2
-#define CELLS_3B CELLS_PER_MODULE * 5 / 2
-#define CELLS_4A CELLS_PER_MODULE * 6 / 2
-#define CELLS_4B CELLS_PER_MODULE * 7 / 2
-#define CELLS_5A CELLS_PER_MODULE * 8 / 2
-#define CELLS_5B CELLS_PER_MODULE * 9 / 2
-#define CELLS_6A CELLS_PER_MODULE * 10 / 2
-#define CELLS_6B CELLS_PER_MODULE * 11 / 2
 
-// objects
-#define NUM_TX_MAILBOXES 2
-#define NUM_RX_MAILBOXES 6
+#define CELLS_1A CELLS_PER_MODULE*0/2
+#define CELLS_1B CELLS_PER_MODULE*1/2
+#define CELLS_2A CELLS_PER_MODULE*2/2
+#define CELLS_2B CELLS_PER_MODULE*3/2
+#define CELLS_3A CELLS_PER_MODULE*4/2
+#define CELLS_3B CELLS_PER_MODULE*5/2
+#define CELLS_4A CELLS_PER_MODULE*6/2
+#define CELLS_4B CELLS_PER_MODULE*7/2
+#define CELLS_5A CELLS_PER_MODULE*8/2
+#define CELLS_5B CELLS_PER_MODULE*9/2
+#define CELLS_6A CELLS_PER_MODULE*10/2
+#define CELLS_6B CELLS_PER_MODULE*11/2
+
+//objects
+#define NUM_TX_MAILBOXES 32
+#define NUM_RX_MAILBOXES 32
+
 FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> ACC_1;
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> CAN_1;
 static CAN_message_t testMsg;
@@ -61,6 +64,7 @@ int8_t rawBatteryTemps[NUMBER_OF_CELLS];
 int8_t batteryTemps[NUMBER_OF_CELLS];
 float ratioTemps; // This is just to make the array a temp variable
 float floatTemps; // This is to save the math as a float first
+
 const float cal5 = -0.000002416676401;
 const float cal4 = 0.001082617446913;
 const float cal3 = -0.194488265848684;   // First part of the ^3 best fit
@@ -70,6 +74,7 @@ const float calIntercept = 14494.861100594600000;
 
 // floatTemps=((((cal5V*rawBatteryTe`1  qaaaaaaa    1qA1QAz1amps[i])/cal255)*(calM))+calB);
 
+
 bool goodID = false;
 
 int moduleNo = 0;                                                         // byte0
@@ -78,7 +83,8 @@ byte getLowestTemp[] = {0x03, 0x22, 0xF0, 0x28, 0x55, 0x55, 0x55, 0x55};  // low
 byte getHighestTemp[] = {0x03, 0x22, 0xF0, 0x29, 0x55, 0x55, 0x55, 0x55}; // highest temp request
 
 // CAN timings
-Metro getACCCanRate = Metro(100, 1);
+
+Metro getACCCanRate = Metro(5,1);
 Metro getTempRate = Metro(500, 1);
 Metro sendTempRate = Metro(100, 1);
 Metro send_can1_2hz = Metro(500, 1);
@@ -93,9 +99,11 @@ Metro printDebug = Metro(1000);
 IntervalTimer check_imd_pwm_timer;
 
 // Globals
-int globalHighTherm = 25, globalLowTherm = 25;
-int pixelColor = 0;
+int globalHighTherm = 30, globalLowTherm = 30;
+int pixelColor=0;
+
 bool inverter_restart = false;
+int moduleCounter = 0; // For the forwardTempData function
 
 /*****PROTOTYPES*****/
 void get_relay_states();
@@ -104,6 +112,9 @@ int readACC_1(CAN_message_t &msg);
 void updateAccumulatorCAN();
 void getTempData();
 void sendTempData();
+
+
+void forwardTempData(uint32_t id, int inital, int end);
 
 FreqReading imd_freq_reading;
 
@@ -227,8 +238,89 @@ void loop()
         sendTempData();
     }
 
-    if (getRelay.check())
-    {
+    // The below code was an attempt to forward the module temp data to canbus 1, however, it causes the teensy to brick and reset.
+    // If you send more than 5 messages in a row, it will cause the teensy to reset. I'm not sure why this is happening lol
+    // I tried 
+
+    // if (forwardTempRate.check()){
+    //     // if(moduleCounter>=11) {
+    //     //     moduleCounter = 0;
+    //     // }
+    //     // switch(moduleCounter){
+    //     //     case(0):
+    //     //     {
+    //     //     forwardTempData(MODULE_1_A, CELLS_1A, CELLS_1B);
+    //     //     break;
+    //     //     Serial.println("Sent data for module 1A");
+    //     //     }
+    //     //     case(1):
+    //     //     {
+    //     //     forwardTempData(MODULE_1_B, CELLS_1B, CELLS_2A);
+    //     //     break;
+    //     //     }
+    //     //     case(2):
+    //     //     {
+    //     //     forwardTempData(MODULE_2_A, CELLS_2A, CELLS_2B);
+    //     //     break;
+    //     //     }
+    //     //     // case(3):
+    //     //     // {
+    //     //     // forwardTempData(MODULE_2_B, CELLS_2B, CELLS_3A);
+    //     //     // break;
+    //     //     // }
+    //     //     // case(4):
+    //     //     // {
+    //     //     // forwardTempData(MODULE_3_A, CELLS_3A, CELLS_3B);
+    //     //     // break;
+    //     //     // }
+    //     //     // case(5):
+    //     //     // forwardTempData(MODULE_3_B, CELLS_3B, CELLS_4A);
+    //     //     // break;
+    //     //     // case(6):
+    //     //     // forwardTempData(MODULE_4_A, CELLS_4A, CELLS_4B);
+    //     //     // break;
+    //     //     // case(7):
+    //     //     // forwardTempData(MODULE_4_B, CELLS_4B, CELLS_5A);
+    //     //     // break;
+    //     //     // case(8):
+    //     //     // forwardTempData(MODULE_5_A, CELLS_5A, CELLS_5B);
+    //     //     // break;
+    //     //     // case(9):
+    //     //     // forwardTempData(MODULE_5_B, CELLS_5B, CELLS_6A);
+    //     //     // break;
+    //     //     // case(10):
+    //     //     // forwardTempData(MODULE_6_A, CELLS_6A, CELLS_6B);
+    //     //     // break;
+    //     //     // case(11):
+    //     //     // forwardTempData(MODULE_6_B, CELLS_6B, NUMBER_OF_CELLS);
+    //     //     // break;
+    //     //     // default:
+    //     //     // break;
+
+    //     // }
+
+    //     // moduleCounter++;   
+
+    //     // delay(50);
+
+    //     // forwardTempData(0x1a0, CELLS_1A, CELLS_1B);
+    //     // forwardTempData(0x1b0, CELLS_1B, CELLS_2A);
+    //     // forwardTempData(0x2a0, CELLS_2A, CELLS_2B);
+    //     // forwardTempData(0x2b0, CELLS_2B, CELLS_3A);
+    //     // forwardTempData(0x3a0, CELLS_3A, CELLS_3B);
+    //     // forwardTempData(0x3b0, CELLS_3B, CELLS_4A);
+    // }
+
+    // // if(forwardTempData2.check()){
+    // //     forwardTempData(0x4a0, CELLS_4A, CELLS_4B);
+    // //     forwardTempData(0x4b0, CELLS_4B, CELLS_5A);
+    // //     forwardTempData(0x5a0, CELLS_5A, CELLS_5B);
+    // //     forwardTempData(0x5b0, CELLS_5B, CELLS_6A);
+    // //     forwardTempData(0x6a0, CELLS_6A, CELLS_6B);
+    // //     forwardTempData(0x6b0, CELLS_6B, NUMBER_OF_CELLS);
+    // // }
+
+    if(getRelay.check()){
         get_relay_states();
         get_vi_measurements();
     }
@@ -317,21 +409,25 @@ void updateAccumulatorCAN()
     CAN_message_t rxMsg;
     if (readACC_1(rxMsg))
     {
-#ifdef DEBUG
-// Serial.print("MB "); Serial.print(rxMsg.mb);
-// Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
-// Serial.print("  LEN: "); Serial.print(rxMsg.len);
-// Serial.print(" EXT: "); Serial.print(rxMsg.flags.extended);
-// Serial.print(" TS: "); Serial.print(rxMsg.timestamp);
-// Serial.print(" ID: "); Serial.print(rxMsg.id, HEX);
-// Serial.print(" Buffer: ");
-// for ( uint8_t i = 0; i < rxMsg.len; i++ ) {
-// Serial.print(rxMsg.buf[i], HEX); Serial.print(" ");
-// }
-// Serial.println();
-#endif
 
-        switch (rxMsg.id) // This is cancer probably and could better be implemented with a loop I imagine
+        CAN_1.write(rxMsg);
+        
+        #ifdef DEBUG
+        // Serial.print("MB "); Serial.print(rxMsg.mb);
+        // Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
+        // Serial.print("  LEN: "); Serial.print(rxMsg.len);
+        // Serial.print(" EXT: "); Serial.print(rxMsg.flags.extended);
+        // Serial.print(" TS: "); Serial.print(rxMsg.timestamp);
+        // Serial.print(" ID: "); Serial.print(rxMsg.id, HEX);
+        // Serial.print(" Buffer: ");
+        // for ( uint8_t i = 0; i < rxMsg.len; i++ ) {
+        // Serial.print(rxMsg.buf[i], HEX); Serial.print(" ");
+        // } 
+        // Serial.println();
+        #endif
+
+        switch (rxMsg.id)  // This is cancer probably and could better be implemented with a loop I imagine
+
         {
         case (MODULE_1_A):
         {
@@ -413,6 +509,43 @@ void updateAccumulatorCAN()
     }
 }
 
+void forwardTempData(uint32_t id, int initial, int end)
+{
+    // Forwarding the calibrated messages onto the CAN 1 (BMS, ACU, VCU, Precharge)
+    CAN_message_t sendTempMsg;
+    sendTempMsg.len = 8; // per protocol
+    sendTempMsg.id = id; // broadcast ID
+    Serial.printf("Starting to populate the message buffer for ID : %d\n",sendTempMsg.id);
+    for (int i=initial; i < end; i++)   {
+        sendTempMsg.buf[i] = static_cast<uint8_t>(batteryTemps[i]);
+        // sendTempMsg.buf[i] = 0;
+
+    }
+    Serial.printf("Start index: %d, End index: %d\n",initial,end);
+    Serial.println("The message we're about to send: ");
+    Serial.print("MB "); 
+    Serial.print(sendTempMsg.mb);
+    Serial.print("  OVERRUN: "); 
+    Serial.print(sendTempMsg.flags.overrun);
+    Serial.print("  LEN: "); 
+    Serial.print(sendTempMsg.len);
+    Serial.print(" EXT: "); 
+    Serial.print(sendTempMsg.flags.extended);
+    Serial.print(" TS: "); 
+    Serial.print(sendTempMsg.timestamp);
+    Serial.print(" ID: "); \
+    Serial.print(sendTempMsg.id, HEX);
+    Serial.print(" Buffer: ");
+    for ( uint8_t i = 0; i < sendTempMsg.len; i++ ) {
+        Serial.print(sendTempMsg.buf[i], HEX); Serial.print(" ");
+    } 
+    Serial.println();
+    CAN_1.write(sendTempMsg);
+    Serial.println("Sent Temp Data: ");
+    Serial.print(id);
+    Serial.println(" ");
+}
+
 // Sending highest/lowest temperature to the BMS
 void sendTempData()
 {
@@ -425,11 +558,32 @@ void sendTempData()
     // This is assigning the calibrated battery temp array from the raw recieved one
     for (int i = 0; i < NUMBER_OF_CELLS; i++)
     {
-
         // Below is some big BS lmao
         ratioTemps = rawBatteryTemps[i]; // Sets the current part of the array to a temp variable so math functions can be done on it
+        floatTemps=(cal5*pow(ratioTemps,5))+(cal4*pow(ratioTemps,4))+(cal3*pow(ratioTemps,3))+(cal2*pow(ratioTemps,2))+(cal1*(ratioTemps))+calIntercept; // Performs the calibration curve math
+        batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
+        
+        #ifdef DEBUG
 
-        floatTemps = (cal5 * pow(ratioTemps, 5)) + (cal4 * pow(ratioTemps, 4)) + (cal3 * pow(ratioTemps, 3)) + (cal2 * pow(ratioTemps, 2)) + (cal1 * (ratioTemps)) + calIntercept; // Performs the calibration curve math
+            // Serial.print("Cell number: ");
+            // Serial.print(i);
+            // Serial.print("Raw Value: ");
+            // Serial.println(rawBatteryTemps[i]);
+
+            // Serial.print("Cell number: ");
+            // Serial.print(i);
+            // Serial.print("floatTemps Value: ");
+            // Serial.println(floatTemps);
+
+            Serial.print("Cell number: ");
+            Serial.print(i);
+            Serial.print(" Value: ");
+            Serial.println(batteryTemps[i]);
+
+            // Serial.println();
+
+        #endif
+
 
         batteryTemps[i] = round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
 
@@ -461,25 +615,19 @@ void sendTempData()
     for (int i = 0; i < NUMBER_OF_CELLS; i++)
     { // get lowest and highest
 
-        if (i >= 0 && i <= 5)
-        {
-            goodID = true;
+        
+        if(i>=0 && i<=11){
+            goodID=true;
         }
-        else if (i >= 12 && i <= 15)
-        {
-            goodID = true;
+        // else if(i>=17 && i<=23){
+        //     goodID=true;
+        // }
+        else if(i>=36 && i<=41){
+            goodID=true;
         }
-        else if (i >= 17 && i <= 17)
-        {
-            goodID = true;
-        }
-        else if (i >= 36 && i <= 41)
-        {
-            goodID = true;
-        }
-        else if (i >= 48 && i <= 53)
-        {
-            goodID = true;
+        else if(i>=44 && i<=59){
+            goodID=true;
+
         }
         else
         {
@@ -608,6 +756,7 @@ void get_relay_states()
     {
         bmsgpiostate = false;
     }
+
 #ifdef DEBUG
     Serial.printf("\nIMD Relay State: %d IMD Gpio State: %d BMS Relay State: %d BMS GPIO State: %d\n\n", imdstate, imdgpiostate, bmsstate, bmsgpiostate);
 #endif

@@ -38,6 +38,7 @@ bool imdstate;
 bool bmsstate;
 bool imdgpiostate;
 bool bmsgpiostate;
+
 // class FreqReading
 // {
 
