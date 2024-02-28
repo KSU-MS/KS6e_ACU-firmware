@@ -193,9 +193,9 @@ void setup()
     // build up fw git hash message
     fw_hash_msg.id = ID_ACU_FW_VERSION;
     fw_hash_msg.len = sizeof(acu_status_t) / sizeof(uint8_t);
-#if DEBUG
+#ifdef DEBUG
     Serial.printf("FW git hash: %lu, IS_DIRTY: %d IS_MAIN: %d\n", AUTO_VERSION, FW_PROJECT_IS_DIRTY, FW_PROJECT_IS_MAIN_OR_MASTER);
-    Serial.printf("FW git hash in the struct: %lu\n", vcu_status_t.firmware_version);
+    Serial.printf("FW git hash in the struct: %lu\n", acu_status_t.firmware_version);
 #endif
     acu_status_t.on_time_seconds = millis() / 1000;
     memcpy(fw_hash_msg.buf, &acu_status_t, sizeof(acu_status_t));
@@ -327,7 +327,7 @@ void loop()
 
     if (send_can1_2hz.check())
     {
-        dashMsg.buf[0] = ID_ACU_RELAY;
+        dashMsg.buf[0] = 0x68;
         dashMsg.buf[1] = imdstate;
         dashMsg.buf[2] = bmsstate;
         dashMsg.buf[3] = imdgpiostate;
