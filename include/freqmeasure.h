@@ -1,5 +1,7 @@
+#ifndef FREQREADING_H
+#define FREQREADING_H
 #include <Metro.h>
-#include <FreqMeasureMulti.h>
+#include <elapsedMillis.h>
 class FreqReading
 {
 
@@ -22,3 +24,4 @@ public:
     float get_imd_frequency();
     void update_readings();
 };
+#endif

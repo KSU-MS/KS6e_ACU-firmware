@@ -52,7 +52,8 @@ void FreqReading::update_readings()
         // Capture total ontime
         this->total_ms = this->ontime;
         // Calculate duty cycle
-        this->set_duty_cycle(this->high_ms / this->total_ms);
+        // Duty cycle is inverted because the ACU reads it through an inverting buffer
+        this->set_duty_cycle(1-(this->high_ms / this->total_ms));
 
         // Calculate period
         float total_s = total_ms / 1000;

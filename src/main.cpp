@@ -18,10 +18,10 @@
 #include <MDB_labels.h>
 #include <math.h>
 #include <ADC_SPI.h>
-#define DEBUG
+// #define DEBUG
 #include "freqmeasure.h"
 #include "device_status.h"
-
+#include "imd.h"
 // #define cantest
 
 // BIG DEFINES FOR MODULES & SWITCH CASE (absolute cancer code)
@@ -117,7 +117,7 @@ void sendTempData();
 void forwardTempData(uint32_t id, int inital, int end);
 
 FreqReading imd_freq_reading;
-
+imd imd_;
 void update_imd_readings()
 {
     imd_freq_reading.update_readings();
@@ -125,6 +125,7 @@ void update_imd_readings()
 ADC_SPI adc_spi;
 device_status_t acu_status_t;
 static CAN_message_t fw_hash_msg;
+static CAN_message_t imd_readings_msg;
 
 // Setup -----------------------------------------------------------------------
 void setup()
@@ -332,8 +333,18 @@ void loop()
         dashMsg.buf[2] = bmsstate;
         dashMsg.buf[3] = imdgpiostate;
         dashMsg.buf[4] = bmsgpiostate;
+        dashMsg.buf[5] = static_cast<uint8_t>(imd_freq_reading.get_imd_frequency());
+        dashMsg.buf[6] = static_cast<uint8_t>(100*imd_freq_reading.get_duty_cycle());
         dashMsg.id = ID_ACU_RELAY;
         CAN_1.write(dashMsg);
+
+        imd_.updateInsulationReading(static_cast<uint8_t>(100*imd_freq_reading.get_duty_cycle()));
+        imd_.updateState(static_cast<uint8_t>(imd_freq_reading.get_imd_frequency()));
+        imd_readings_msg.id = ID_ACU_IMD_READING;
+        imd_readings_msg.len = sizeof(imd_);
+        memcpy(imd_readings_msg.buf,&imd_,sizeof(imd_));
+        CAN_1.write(imd_readings_msg);
+
 
         vi_measurementsMsg.id = ID_ACU_MEASUREMENTS;
         vi_measurementsMsg.buf[0] = vsense12v;
@@ -346,7 +357,7 @@ void loop()
         vi_measurementsMsg.buf[7] = temp;
         CAN_1.write(vi_measurementsMsg);
 
-        Serial.printf("Imd freq: %f duty: %f\n", imd_freq_reading.get_imd_frequency(), imd_freq_reading.get_duty_cycle());
+        Serial.printf("Imd freq: %dHz duty: %d%\n", static_cast<uint8_t>(imd_freq_reading.get_imd_frequency()), static_cast<uint8_t>(100*imd_freq_reading.get_duty_cycle()));
     }
     if (send_can1_1hz.check())
     {
