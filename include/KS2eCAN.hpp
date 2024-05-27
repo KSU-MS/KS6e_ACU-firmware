@@ -36,6 +36,7 @@
 #define ID_PRECHARGE_STATUS 0x69
 #define ID_ACU_MEASUREMENTS 0x259
 #define ID_ACU_FW_VERSION 0x25A
+#define ID_ACU_IMD_READING 0x25B
 
 // number of rx and tx mailboxes
 #define NUM_TX_MAILBOXES 2
