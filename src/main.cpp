@@ -29,18 +29,18 @@
 #define NUMBER_OF_MODULES 6
 #define CELLS_PER_MODULE 12
 
-#define CELLS_1A CELLS_PER_MODULE*0/2
-#define CELLS_1B CELLS_PER_MODULE*1/2
-#define CELLS_2A CELLS_PER_MODULE*2/2
-#define CELLS_2B CELLS_PER_MODULE*3/2
-#define CELLS_3A CELLS_PER_MODULE*4/2
-#define CELLS_3B CELLS_PER_MODULE*5/2
-#define CELLS_4A CELLS_PER_MODULE*6/2
-#define CELLS_4B CELLS_PER_MODULE*7/2
-#define CELLS_5A CELLS_PER_MODULE*8/2
-#define CELLS_5B CELLS_PER_MODULE*9/2
-#define CELLS_6A CELLS_PER_MODULE*10/2
-#define CELLS_6B CELLS_PER_MODULE*11/2
+#define CELLS_1A (CELLS_PER_MODULE*0/2)
+#define CELLS_1B (CELLS_PER_MODULE*1/2)
+#define CELLS_2A (CELLS_PER_MODULE*2/2)
+#define CELLS_2B (CELLS_PER_MODULE*3/2)
+#define CELLS_3A (CELLS_PER_MODULE*4/2)
+#define CELLS_3B (CELLS_PER_MODULE*5/2)
+#define CELLS_4A (CELLS_PER_MODULE*6/2)
+#define CELLS_4B (CELLS_PER_MODULE*7/2)
+#define CELLS_5A (CELLS_PER_MODULE*8/2)
+#define CELLS_5B (CELLS_PER_MODULE*9/2)
+#define CELLS_6A (CELLS_PER_MODULE*10/2)
+#define CELLS_6B (CELLS_PER_MODULE*11/2)
 
 //objects
 #define NUM_TX_MAILBOXES 32
@@ -60,10 +60,12 @@ static CAN_message_t vi_measurementsMsg;
 #define BMS_Response_ID 0x7EB
 
 // CAN bytes
+int8_t last_raw_battery_temps[NUMBER_OF_CELLS];
 int8_t rawBatteryTemps[NUMBER_OF_CELLS];
 int8_t batteryTemps[NUMBER_OF_CELLS];
 float ratioTemps; // This is just to make the array a temp variable
 float floatTemps; // This is to save the math as a float first
+// eqn: 13475.2232 + -39369.8530x^1 + 48252.5883x^2 + -31469.0020x^3 + 11457.9048x^4 + -2198.7382x^5 + 172.7166x^6
 
 const float cal5 = -0.000002416676401;
 const float cal4 = 0.001082617446913;
@@ -71,7 +73,13 @@ const float cal3 = -0.194488265848684;   // First part of the ^3 best fit
 const float cal2 = 17.519770902801400;   // Second
 const float cal1 = -792.865188960333000; // Third
 const float calIntercept = 14494.861100594600000;
-
+// const float calIntercept = 13475.2232;
+// const float cal6 = 172.7166;
+// const float cal5 = -2198.7382;
+// const float cal4 = 11457.9048;
+// const float cal3 = -31469.0020;
+// const float cal2 = 48252.5883;
+// const float cal1 = -39369.8530;
 // floatTemps=((((cal5V*rawBatteryTe`1  qaaaaaaa    1qA1QAz1amps[i])/cal255)*(calM))+calB);
 
 
@@ -99,7 +107,7 @@ Metro printDebug = Metro(1000);
 IntervalTimer check_imd_pwm_timer;
 
 // Globals
-int globalHighTherm = 30, globalLowTherm = 30;
+int globalHighTherm = 30, globalLowTherm = 30, globalAvgTherm = 30;
 int pixelColor=0;
 
 bool inverter_restart = false;
@@ -150,6 +158,7 @@ void setup()
         Serial.print(i);
         Serial.print(" Value: ");
         rawBatteryTemps[i] = 0; // init default temps as a safe value
+        last_raw_battery_temps[i] = 0;
         Serial.println(rawBatteryTemps[i]);
     }
 
@@ -420,21 +429,33 @@ void updateAccumulatorCAN()
     CAN_message_t rxMsg;
     if (readACC_1(rxMsg))
     {
-
+        if ((rxMsg.flags.extended == true) && (rxMsg.id <= MODULE_6_B+1))
+        {
+            CAN_message_t new_rx;
+            new_rx.id = rxMsg.id;
+            memcpy(new_rx.buf,rxMsg.buf,sizeof(new_rx.buf));
+            rxMsg.flags.extended = false;
+            rxMsg.flags.remote = 0;
+            CAN_1.write(new_rx);
+        }
+        else
+        {
         CAN_1.write(rxMsg);
+        }
+
         
         #ifdef DEBUG
-        // Serial.print("MB "); Serial.print(rxMsg.mb);
-        // Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
-        // Serial.print("  LEN: "); Serial.print(rxMsg.len);
-        // Serial.print(" EXT: "); Serial.print(rxMsg.flags.extended);
-        // Serial.print(" TS: "); Serial.print(rxMsg.timestamp);
-        // Serial.print(" ID: "); Serial.print(rxMsg.id, HEX);
-        // Serial.print(" Buffer: ");
-        // for ( uint8_t i = 0; i < rxMsg.len; i++ ) {
-        // Serial.print(rxMsg.buf[i], HEX); Serial.print(" ");
-        // } 
-        // Serial.println();
+        Serial.print("MB "); Serial.print(rxMsg.mb);
+        Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
+        Serial.print("  LEN: "); Serial.print(rxMsg.len);
+        Serial.print(" EXT: "); Serial.print(rxMsg.flags.extended);
+        Serial.print(" TS: "); Serial.print(rxMsg.timestamp);
+        Serial.print(" ID: "); Serial.print(rxMsg.id, HEX);
+        Serial.print(" Buffer: ");
+        for ( uint8_t i = 0; i < rxMsg.len; i++ ) {
+        Serial.print(rxMsg.buf[i], HEX); Serial.print(" ");
+        } 
+        Serial.println();
         #endif
 
         switch (rxMsg.id)  // This is cancer probably and could better be implemented with a loop I imagine
@@ -442,74 +463,134 @@ void updateAccumulatorCAN()
         {
         case (MODULE_1_A):
         {
-            // Serial.println("Module 1 A");
-            memcpy(rawBatteryTemps + CELLS_1A, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_1A] = raw_temp;
+            }
             break;
         }
         case (MODULE_1_B):
         {
-            // Serial.println("Module 1 B");
-            memcpy(rawBatteryTemps + CELLS_1B, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_1B] = raw_temp;
+            }
             break;
         }
         case (MODULE_2_A):
         {
-            // Serial.println("Module 2 A");
-            memcpy(rawBatteryTemps + CELLS_2A, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_2A] = raw_temp;
+            }
             break;
         }
         case (MODULE_2_B):
         {
-            // Serial.println("Module 2 B");
-            memcpy(rawBatteryTemps + CELLS_2B, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_2B] = raw_temp;
+            }
             break;
         }
         case (MODULE_3_A):
         {
-            // Serial.println("Module 3 A");
-            memcpy(rawBatteryTemps + CELLS_3A, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_3A] = raw_temp;
+            }
             break;
         }
         case (MODULE_3_B):
         {
-            // Serial.println("Module 3 B");
-            memcpy(rawBatteryTemps + CELLS_3B, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_3B] = raw_temp;
+            }
             break;
         }
         case (MODULE_4_A):
         {
-            // Serial.println("Module 4 A");
-            memcpy(rawBatteryTemps + CELLS_4A, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_4A] = raw_temp;
+            }
             break;
         }
         case (MODULE_4_B):
         {
-            // Serial.println("Module 4 B");
-            memcpy(rawBatteryTemps + CELLS_4B, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_4B] = raw_temp;
+            }
             break;
         }
         case (MODULE_5_A):
         {
-            // Serial.println("Module 5 A");
-            memcpy(rawBatteryTemps + CELLS_5A, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_5A] = raw_temp;
+            }
             break;
         }
         case (MODULE_5_B):
         {
-            // Serial.println("Module 5 B");
-            memcpy(rawBatteryTemps + CELLS_5B, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_5B] = raw_temp;
+            }
             break;
         }
         case (MODULE_6_A):
         {
-            // Serial.println("Module 6 A");
-            memcpy(rawBatteryTemps + CELLS_6A, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_6A] = raw_temp;
+            }
             break;
         }
         case (MODULE_6_B):
         {
-            // Serial.println("Module 6 B");
-            memcpy(rawBatteryTemps + CELLS_6B, rxMsg.buf, 6);
+            uint64_t segment_data;
+            memcpy(&segment_data, rxMsg.buf, sizeof(segment_data));
+            for (int i = 0; i < 6; i++)
+            {
+                uint16_t raw_temp = (segment_data >> (i * 10)) & 0x3ff;
+                rawBatteryTemps[i + CELLS_6B] = raw_temp;
+            }
             break;
         }
         default:
@@ -572,14 +653,39 @@ void sendTempData()
         // Below is some big BS lmao
         ratioTemps = rawBatteryTemps[i]; // Sets the current part of the array to a temp variable so math functions can be done on it
         floatTemps=(cal5*pow(ratioTemps,5))+(cal4*pow(ratioTemps,4))+(cal3*pow(ratioTemps,3))+(cal2*pow(ratioTemps,2))+(cal1*(ratioTemps))+calIntercept; // Performs the calibration curve math
-        batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
+        if (floatTemps > 80)
+        {
+            floatTemps = 80;
+        }
+        if (floatTemps < -40)
+        {
+            floatTemps = -40;
+        }
+        if (millis() > 200)
+        {
+            float diff_ = abs((floatTemps - static_cast<float>(globalAvgTherm)) / static_cast<float>(globalAvgTherm));
+            Serial.printf("Cell: %d RatioTemps: %f FloatTemps: %f GlobalAvg: %d Diff: %f\n",i,ratioTemps,floatTemps,globalAvgTherm,diff_);
+            if (diff_ > .7)
+            {
+                batteryTemps[i] = 25;
+                continue;
+            }
+            else
+            {
+                batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
+            }
+        }
+        else
+        {
+            batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
+        }
         
-        #ifdef DEBUG
+        // #ifdef DEBUG
 
-            // Serial.print("Cell number: ");
-            // Serial.print(i);
-            // Serial.print("Raw Value: ");
-            // Serial.println(rawBatteryTemps[i]);
+            Serial.print("Cell number: ");
+            Serial.print(i);
+            Serial.print("Raw Value: ");
+            Serial.println(rawBatteryTemps[i]);
 
             // Serial.print("Cell number: ");
             // Serial.print(i);
@@ -593,7 +699,7 @@ void sendTempData()
 
             // Serial.println();
 
-        #endif
+        // #endif
 
 
         batteryTemps[i] = round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
@@ -688,6 +794,7 @@ void sendTempData()
     // GLobal ints for tracking
     globalHighTherm = highTherm;
     globalLowTherm = lowTherm;
+    globalAvgTherm = avgTherm;
 }
 
 // getting one of the max temps from BMS (high or low not sure lol)
