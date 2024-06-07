@@ -29,18 +29,18 @@
 #define NUMBER_OF_MODULES 6
 #define CELLS_PER_MODULE 12
 
-#define CELLS_1A CELLS_PER_MODULE*0/2
-#define CELLS_1B CELLS_PER_MODULE*1/2
-#define CELLS_2A CELLS_PER_MODULE*2/2
-#define CELLS_2B CELLS_PER_MODULE*3/2
-#define CELLS_3A CELLS_PER_MODULE*4/2
-#define CELLS_3B CELLS_PER_MODULE*5/2
-#define CELLS_4A CELLS_PER_MODULE*6/2
-#define CELLS_4B CELLS_PER_MODULE*7/2
-#define CELLS_5A CELLS_PER_MODULE*8/2
-#define CELLS_5B CELLS_PER_MODULE*9/2
-#define CELLS_6A CELLS_PER_MODULE*10/2
-#define CELLS_6B CELLS_PER_MODULE*11/2
+#define CELLS_1A (CELLS_PER_MODULE*0/2)
+#define CELLS_1B (CELLS_PER_MODULE*1/2)
+#define CELLS_2A (CELLS_PER_MODULE*2/2)
+#define CELLS_2B (CELLS_PER_MODULE*3/2)
+#define CELLS_3A (CELLS_PER_MODULE*4/2)
+#define CELLS_3B (CELLS_PER_MODULE*5/2)
+#define CELLS_4A (CELLS_PER_MODULE*6/2)
+#define CELLS_4B (CELLS_PER_MODULE*7/2)
+#define CELLS_5A (CELLS_PER_MODULE*8/2)
+#define CELLS_5B (CELLS_PER_MODULE*9/2)
+#define CELLS_6A (CELLS_PER_MODULE*10/2)
+#define CELLS_6B (CELLS_PER_MODULE*11/2)
 
 //objects
 #define NUM_TX_MAILBOXES 32
@@ -64,6 +64,7 @@ int8_t rawBatteryTemps[NUMBER_OF_CELLS];
 int8_t batteryTemps[NUMBER_OF_CELLS];
 float ratioTemps; // This is just to make the array a temp variable
 float floatTemps; // This is to save the math as a float first
+// eqn: 13475.2232 + -39369.8530x^1 + 48252.5883x^2 + -31469.0020x^3 + 11457.9048x^4 + -2198.7382x^5 + 172.7166x^6
 
 const float cal5 = -0.000002416676401;
 const float cal4 = 0.001082617446913;
@@ -71,7 +72,13 @@ const float cal3 = -0.194488265848684;   // First part of the ^3 best fit
 const float cal2 = 17.519770902801400;   // Second
 const float cal1 = -792.865188960333000; // Third
 const float calIntercept = 14494.861100594600000;
-
+// const float calIntercept = 13475.2232;
+// const float cal6 = 172.7166;
+// const float cal5 = -2198.7382;
+// const float cal4 = 11457.9048;
+// const float cal3 = -31469.0020;
+// const float cal2 = 48252.5883;
+// const float cal1 = -39369.8530;
 // floatTemps=((((cal5V*rawBatteryTe`1  qaaaaaaa    1qA1QAz1amps[i])/cal255)*(calM))+calB);
 
 
@@ -99,7 +106,7 @@ Metro printDebug = Metro(1000);
 IntervalTimer check_imd_pwm_timer;
 
 // Globals
-int globalHighTherm = 30, globalLowTherm = 30;
+int globalHighTherm = 30, globalLowTherm = 30, globalAvgTherm = 30;
 int pixelColor=0;
 
 bool inverter_restart = false;
@@ -420,21 +427,33 @@ void updateAccumulatorCAN()
     CAN_message_t rxMsg;
     if (readACC_1(rxMsg))
     {
-
+        if ((rxMsg.flags.extended == true) && (rxMsg.id <= MODULE_6_B+1))
+        {
+            CAN_message_t new_rx;
+            new_rx.id = rxMsg.id;
+            memcpy(new_rx.buf,rxMsg.buf,sizeof(new_rx.buf));
+            rxMsg.flags.extended = false;
+            rxMsg.flags.remote = 0;
+            CAN_1.write(new_rx);
+        }
+        else
+        {
         CAN_1.write(rxMsg);
+        }
+
         
         #ifdef DEBUG
-        // Serial.print("MB "); Serial.print(rxMsg.mb);
-        // Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
-        // Serial.print("  LEN: "); Serial.print(rxMsg.len);
-        // Serial.print(" EXT: "); Serial.print(rxMsg.flags.extended);
-        // Serial.print(" TS: "); Serial.print(rxMsg.timestamp);
-        // Serial.print(" ID: "); Serial.print(rxMsg.id, HEX);
-        // Serial.print(" Buffer: ");
-        // for ( uint8_t i = 0; i < rxMsg.len; i++ ) {
-        // Serial.print(rxMsg.buf[i], HEX); Serial.print(" ");
-        // } 
-        // Serial.println();
+        Serial.print("MB "); Serial.print(rxMsg.mb);
+        Serial.print("  OVERRUN: "); Serial.print(rxMsg.flags.overrun);
+        Serial.print("  LEN: "); Serial.print(rxMsg.len);
+        Serial.print(" EXT: "); Serial.print(rxMsg.flags.extended);
+        Serial.print(" TS: "); Serial.print(rxMsg.timestamp);
+        Serial.print(" ID: "); Serial.print(rxMsg.id, HEX);
+        Serial.print(" Buffer: ");
+        for ( uint8_t i = 0; i < rxMsg.len; i++ ) {
+        Serial.print(rxMsg.buf[i], HEX); Serial.print(" ");
+        } 
+        Serial.println();
         #endif
 
         switch (rxMsg.id)  // This is cancer probably and could better be implemented with a loop I imagine
@@ -574,7 +593,7 @@ void sendTempData()
         floatTemps=(cal5*pow(ratioTemps,5))+(cal4*pow(ratioTemps,4))+(cal3*pow(ratioTemps,3))+(cal2*pow(ratioTemps,2))+(cal1*(ratioTemps))+calIntercept; // Performs the calibration curve math
         batteryTemps[i]=round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
         
-        #ifdef DEBUG
+        // #ifdef DEBUG
 
             // Serial.print("Cell number: ");
             // Serial.print(i);
@@ -593,7 +612,7 @@ void sendTempData()
 
             // Serial.println();
 
-        #endif
+        // #endif
 
 
         batteryTemps[i] = round(floatTemps); // Rounds up or down according to standard practice before setting it back equal to battery temps
@@ -688,6 +707,7 @@ void sendTempData()
     // GLobal ints for tracking
     globalHighTherm = highTherm;
     globalLowTherm = lowTherm;
+    globalAvgTherm = avgTherm;
 }
 
 // getting one of the max temps from BMS (high or low not sure lol)
